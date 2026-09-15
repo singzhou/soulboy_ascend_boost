@@ -36,5 +36,4 @@ function(soulboy_configure_ascendc)
     message(STATUS "Ascend C CMake: ${ASCENDC_CMAKE_DIR}")
     message(STATUS "Target SoC: ${SOC_VERSION}")
 
-    include("${ASCENDC_CMAKE_DIR}/ascendc.cmake")
 endfunction()

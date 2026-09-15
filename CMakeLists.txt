@@ -18,6 +18,12 @@ option(SOULBOY_BUILD_PTA "Build the PyTorch/torch_npu extension" OFF)
 include(cmake/AscendC.cmake)
 soulboy_configure_ascendc()
 
+# Keep this include in directory scope. CANN's ascendc.cmake initializes
+# variables consumed later by ascendc_library(); including it inside
+# soulboy_configure_ascendc() would discard those variables when the function
+# returns and make CANN resolve its precompile project as /device_precompile_project.
+include("${ASCENDC_CMAKE_DIR}/ascendc.cmake")
+
 add_subdirectory(csrc)
 
 if(SOULBOY_BUILD_PTA)
