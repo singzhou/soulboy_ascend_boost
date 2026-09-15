@@ -1309,7 +1309,7 @@ inline void UnInitCacheThreadLocal()
         void *workspace_addr = nullptr;                                                                                \
         at::Tensor workspace_tensor;                                                                                   \
         if (workspace_size != 0) {                                                                                     \
-            workspace_tensor = at_npu::native::OpPreparation::unsafe_empty_workspace(workspace_size, acl_stream);      \
+            workspace_tensor = at_npu::native::OpPreparation::unsafe_empty_workspace(workspace_size);                  \
             workspace_addr = const_cast<void *>(workspace_tensor.storage().data());                                    \
         }                                                                                                              \
         auto acl_call = [converted_params, workspace_addr, workspace_size, acl_stream, executor]()->int {              \
@@ -1367,8 +1367,8 @@ inline void UnInitCacheThreadLocal()
     void *workspace_addr = nullptr;                                           \
     at::Tensor workspace_tensor;                                              \
     if (workspace_size != 0) {                                                \
-      workspace_tensor = at_npu::native::OpPreparation::unsafe_empty_workspace( \
-          workspace_size, acl_stream);                                        \
+      workspace_tensor =                                                      \
+          at_npu::native::OpPreparation::unsafe_empty_workspace(workspace_size); \
       workspace_addr = const_cast<void *>(workspace_tensor.storage().data()); \
     }                                                                         \
     auto acl_call = [converted_params, workspace_addr, workspace_size,        \
