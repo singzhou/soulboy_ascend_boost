@@ -57,8 +57,9 @@ workspace、精度、支持 SoC/CANN 版本和已知限制。
 
 - 只影响执行规模的 Device Tensor 使用 `ValueDepend(..., DependScope::TILING)`，不得在 Python/PTA
   中 `.item()` 造成 D2H 同步。
-- Host TilingData 使用 `register/tilingdata_base.h`；kernel 侧使用字段完全一致的定宽 POD，禁止把
-  Host 注册头带入 AI Core 编译。
+- Host TilingData 使用 `register/tilingdata_base.h`；custom OPP 构建会自动生成并注入 kernel 侧
+  `*_tiling_data.h`，kernel 必须通过 `GET_TILING_DATA`/`GET_TILING_DATA_WITH_STRUCT` 使用它。禁止再定义
+  同名 POD，也禁止把 Host 注册头带入 AI Core 编译。
 - Host 与 Device Tiling 复用同一策略函数；注册宏分别使用 `IMPL_OP_OPTILING` 和
   `DEVICE_IMPL_OP_OPTILING`。
 - Tiling 必须检查空指针、rank、shape、值域和溢出；失败时不得写半初始化数据。
