@@ -50,6 +50,7 @@ if(COMMAND npu_op_device_tiling_library)
         "${CMAKE_CURRENT_LIST_DIR}"
         ${_cann_host_include_dirs}
     )
+    target_compile_definitions(cust_opmaster PRIVATE SOULBOY_DEVICE_TILING=1)
     install(TARGETS cust_opmaster LIBRARY DESTINATION lib)
 else()
     message(WARNING

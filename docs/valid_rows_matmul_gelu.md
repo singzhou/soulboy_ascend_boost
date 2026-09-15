@@ -39,6 +39,10 @@ custom-op CMake 中提供 `npu_op_device_tiling_library`。
 `register/tilingdata_base.h`，后者只依赖 `kernel_tiling/kernel_tiling.h`，两者字段顺序和宽度
 必须保持一致。
 
+为兼容 CANN 9.0.1 的 legacy kernel 工程，kernel 直接把 tiling GM 地址解释为上述 POD，
+不依赖较新版本才提供的 `GET_TILING_DATA_WITH_STRUCT` 宏。Host 使用
+`IMPL_OP_OPTILING`；只有构建 Device Tiling target 时才启用 `DEVICE_IMPL_OP_OPTILING`。
+
 ## Python 示例
 
 ```python

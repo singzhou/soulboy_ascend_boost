@@ -1,8 +1,11 @@
 #include <algorithm>
 #include <cstdint>
 
+#ifdef SOULBOY_DEVICE_TILING
 #include "register/device_op_impl_registry.h"
+#else
 #include "register/op_impl_registry.h"
+#endif
 #include "tiling/platform/platform_ascendc.h"
 #include "valid_rows_matmul_gelu_tiling.h"
 
@@ -70,12 +73,9 @@ ge::graphStatus ValidRowsMatmulGeluTiling(gert::TilingContext *context)
     return FillTiling(context);
 }
 
-extern "C" __attribute__((visibility("default"))) ge::graphStatus
-DeviceValidRowsMatmulGeluTiling(gert::TilingContext *context)
-{
-    return FillTiling(context);
-}
-
-REGISTER_OP_IMPL(ValidRowsMatmulGelu).Tiling(ValidRowsMatmulGeluTiling);
-DEVICE_IMPL_OP_OPTILING(ValidRowsMatmulGelu).Tiling(DeviceValidRowsMatmulGeluTiling);
+#ifdef SOULBOY_DEVICE_TILING
+DEVICE_IMPL_OP_OPTILING(ValidRowsMatmulGelu).Tiling(ValidRowsMatmulGeluTiling);
+#else
+IMPL_OP_OPTILING(ValidRowsMatmulGelu).Tiling(ValidRowsMatmulGeluTiling);
+#endif
 }  // namespace optiling
