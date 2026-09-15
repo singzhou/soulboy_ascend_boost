@@ -18,6 +18,10 @@ endif()
 
 ascendc_library(${SOULBOY_KERNEL_TARGET} SHARED ${SOULBOY_KERNEL_SOURCES})
 
+if(SOULBOY_BUILD_OP_HOST)
+    add_subdirectory(ops/valid_rows_matmul_gelu/op_host)
+endif()
+
 install(
     TARGETS ${SOULBOY_KERNEL_TARGET}
     LIBRARY DESTINATION lib

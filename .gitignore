@@ -8,4 +8,7 @@ output/
 *.so
 *.run
 __pycache__/
+*.egg-info/
+dist/
+.pytest_cache/
 .DS_Store

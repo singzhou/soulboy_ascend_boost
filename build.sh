@@ -10,6 +10,8 @@ BUILD_TYPE="${BUILD_TYPE:-Release}"
 JOBS="${JOBS:-$(getconf _NPROCESSORS_ONLN 2>/dev/null || echo 8)}"
 TARGET="install"
 CLEAN=0
+BUILD_PTA=0
+BUILD_OP_HOST=1
 
 usage() {
     cat <<'EOF'
@@ -21,6 +23,8 @@ Options:
   -t, --target TARGET    CMake target (default: install)
       --build-type TYPE  CMake build type (default: Release)
       --clean            Remove build and output directories first
+      --pta              Also build the PyTorch/torch_npu extension
+      --kernel-only      Skip GE host and device-tiling libraries
   -h, --help             Show this help
 
 Environment:
@@ -51,6 +55,14 @@ while (($#)); do
             CLEAN=1
             shift
             ;;
+        --pta)
+            BUILD_PTA=1
+            shift
+            ;;
+        --kernel-only)
+            BUILD_OP_HOST=0
+            shift
+            ;;
         -h|--help)
             usage
             exit 0
@@ -73,6 +85,8 @@ cmake_args=(
     -DCMAKE_BUILD_TYPE="${BUILD_TYPE}"
     -DCMAKE_INSTALL_PREFIX="${OUTPUT_DIR}"
     -DSOC_VERSION="${SOC_VERSION}"
+    -DSOULBOY_BUILD_PTA="${BUILD_PTA}"
+    -DSOULBOY_BUILD_OP_HOST="${BUILD_OP_HOST}"
 )
 
 if [[ -n "${ASCENDC_CMAKE_DIR:-}" ]]; then

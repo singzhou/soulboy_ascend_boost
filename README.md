@@ -20,8 +20,10 @@ SoC、构建类型和安装目录。
                 └── *.cpp
 ```
 
-`csrc/ops/soulboy_identity` 是用于说明目录约定的最小样例。后续算子只需放到
-`csrc/ops/<operator>/op_kernel/`，CMake 会自动发现其中的 `.cpp` 文件。
+首个完整算子是 `ValidRowsMatmulGelu`，包含值依赖 Host/Device Tiling、Ascend C bring-up
+kernel、PTA 注册、Python 包装、示例和 contract tests。接口与当前实现边界见
+[`docs/valid_rows_matmul_gelu.md`](docs/valid_rows_matmul_gelu.md)，新增算子的统一规范见
+[`DEVELOPMENT_GUIDE.md`](DEVELOPMENT_GUIDE.md)。`soulboy_identity` 只保留为最小编译样例。
 
 ## 环境要求
 
@@ -42,6 +44,7 @@ source /usr/local/Ascend/ascend-toolkit/set_env.sh
 
 ```bash
 ./build.sh --soc ascend910b
+./build.sh --soc ascend910b --pta
 ```
 
 常用选项：
@@ -62,6 +65,20 @@ cmake -S . -B build \
 cmake --build build --target install --parallel
 ```
 
+## Python 使用
+
+```bash
+python -m pip install -e .
+python examples/valid_rows_matmul_gelu.py
+```
+
+PTA 共享库默认从 `output/lib/libsoulboy_pta.so` 加载，也可通过
+`SOULBOY_PTA_LIBRARY` 指定。CPU 侧 contract tests 可用：
+
+```bash
+PYTHONPATH=python python -m pytest tests/test_python_contract.py
+```
+
 ## 新增算子
 
 1. 新建 `csrc/ops/<operator>/op_kernel/`。
@@ -69,5 +86,6 @@ cmake --build build --target install --parallel
 3. 如需公共头文件，可在算子目录下增加 `include/`，并在 `csrc/CMakeLists.txt` 中给目标添加 include path。
 4. 执行 `./build.sh --soc <soc_version>`。
 
-样例 Kernel 仅用于演示工程接线，并假设 FP16 元素数量满足 32 字节对齐；生产算子应自行实现
-完整的 Tiling、尾块处理、Host 注册和测试。
+新增前先阅读 `DEVELOPMENT_GUIDE.md`。本仓库当前的 `ValidRowsMatmulGelu` Ascend C kernel
+仍是 bring-up 版本；用户侧可验收语义由 PTA 组合实现提供，生产性能 kernel 尚需在 910B
+机器上用 Matmul 高阶 API 和 AIC/AIV 混合核替换。

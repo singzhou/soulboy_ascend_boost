@@ -12,8 +12,14 @@ set(ASCENDC_CMAKE_DIR "" CACHE PATH "Directory containing ascendc.cmake")
 set(SOULBOY_KERNEL_TARGET "soulboy_ascend_kernels" CACHE STRING "Kernel library target name")
 
 option(SOULBOY_ENABLE_EXAMPLE "Build the example identity kernel" ON)
+option(SOULBOY_BUILD_OP_HOST "Build the GE host/device-tiling registration libraries" ON)
+option(SOULBOY_BUILD_PTA "Build the PyTorch/torch_npu extension" OFF)
 
 include(cmake/AscendC.cmake)
 soulboy_configure_ascendc()
 
 add_subdirectory(csrc)
+
+if(SOULBOY_BUILD_PTA)
+    add_subdirectory(pta)
+endif()
