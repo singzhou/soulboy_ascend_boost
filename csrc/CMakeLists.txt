@@ -17,6 +17,13 @@ if(NOT SOULBOY_KERNEL_SOURCES)
 endif()
 
 ascendc_library(${SOULBOY_KERNEL_TARGET} SHARED ${SOULBOY_KERNEL_SOURCES})
+ascendc_include_directories(${SOULBOY_KERNEL_TARGET} PRIVATE
+    "${CMAKE_CURRENT_SOURCE_DIR}"
+    "${ASCEND_CANN_PACKAGE_PATH}/include"
+    "${ASCEND_CANN_PACKAGE_PATH}/include/ascendc"
+    "${ASCEND_CANN_PACKAGE_PATH}/include/external"
+    "${ASCEND_CANN_PACKAGE_PATH}/include/experiment/platform"
+)
 
 if(SOULBOY_BUILD_OP_HOST)
     add_subdirectory(ops/valid_rows_matmul_gelu/op_host)

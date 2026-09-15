@@ -46,6 +46,8 @@ Host 和 Device tiling 应调用同一个纯策略函数，避免两份逻辑漂
    `ValueDepend(OPTIONAL, DependScope::TILING)`。
 2. 非法值返回失败，不静默 clamp；`0`、空张量、对齐边界和最大值都有明确语义。
 3. TilingData 只含定宽 POD 字段和官方可序列化结构，不放指针、STL 容器或 ABI 敏感对象。
+   Host 定义使用 `register/tilingdata_base.h`；kernel 定义使用
+   `kernel_tiling/kernel_tiling.h` 和等价 POD，禁止让 AI Core 编译依赖 Host 注册头文件。
 4. workspace 用 `uint64_t/size_t` 检查溢出并按编译期最大 shape 预留。
 5. PTA 同时注册 `PrivateUse1` 与 `Meta`；Meta 路径不得访问 Tensor 数据。
 6. Python 封装保留 Device Tensor 参数，禁止为方便调用 `.item()` 引入隐式 D2H 同步。

@@ -1,9 +1,9 @@
 #include <algorithm>
 #include <cstdint>
 
-#include "platform/platform_ascendc.h"
 #include "register/device_op_impl_registry.h"
 #include "register/op_impl_registry.h"
+#include "tiling/platform/platform_ascendc.h"
 #include "valid_rows_matmul_gelu_tiling.h"
 
 namespace optiling {

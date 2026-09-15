@@ -22,7 +22,7 @@ extern "C" __global__ __aicore__ void valid_rows_matmul_gelu(
 {
     (void)valid_rows;
     (void)workspace;
-    GET_TILING_DATA(td, tiling);
+    GET_TILING_DATA_WITH_STRUCT(ValidRowsMatmulGeluTilingData, td, tiling);
 
     GlobalTensor<half> xGm;
     GlobalTensor<half> weightGm;

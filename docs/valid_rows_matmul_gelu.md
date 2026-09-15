@@ -34,6 +34,11 @@ export CMAKE_PREFIX_PATH="$(python -c 'import torch; print(torch.utils.cmake_pre
 `./build.sh --kernel-only` 只验证 Ascend C kernel；完整的 Device Tiling 需要 CANN 9.x
 custom-op CMake 中提供 `npu_op_device_tiling_library`。
 
+工程显式加入 CANN 的 `include`、`include/external` 和
+`include/experiment/platform`。Host TilingData 与 kernel wire struct 分开放置：前者使用
+`register/tilingdata_base.h`，后者只依赖 `kernel_tiling/kernel_tiling.h`，两者字段顺序和宽度
+必须保持一致。
+
 ## Python 示例
 
 ```python
