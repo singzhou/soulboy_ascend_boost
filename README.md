@@ -1,8 +1,9 @@
 # soulboy_ascend_boost
 
-面向 Ascend C 自定义算子的轻量编译工程。工程结构参考 `ops-transformer` 和
-`omni-ops`：CMake 负责接入 CANN Ascend C 工具链，算子按独立目录组织，构建脚本统一管理
-SoC、构建类型和安装目录。
+面向昇腾推理场景的 Ascend C 自定义算子工程。工程布局、Ascend C run 包构建、安装方式和
+PyTorch NPU 扩展构建方式与 `omni-ops/inference/ascendc` 保持一致。
+
+首个算子是 `ValidRowsMatmulGelu`：只计算前 `valid_rows` 行的矩阵乘、Bias 和 GELU，输出其余行清零。
 
 ## 目录结构
 
@@ -10,82 +11,97 @@ SoC、构建类型和安装目录。
 .
 ├── CMakeLists.txt
 ├── build.sh
-├── cmake/
-│   └── AscendC.cmake
-└── csrc/
-    ├── CMakeLists.txt
-    └── ops/
-        └── <operator>/
-            └── op_kernel/
-                └── *.cpp
+├── cmake/                         # custom OPP/CPack 构建框架
+├── scripts/                       # 打包辅助脚本
+├── src/
+│   ├── ops-transformer/
+│   │   └── matmul/
+│   │       └── valid_rows_matmul_gelu/
+│   │           ├── docs/
+│   │           ├── example/
+│   │           ├── op_host/       # OpDef、Host/Device Tiling
+│   │           └── op_kernel/     # Ascend C Kernel
+│   └── utils/
+└── torch_ops_extension/
+    ├── soulboy_custom_ops/
+    ├── setup.py
+    └── build_and_install.sh
 ```
 
-首个完整算子是 `ValidRowsMatmulGelu`，包含值依赖 Host/Device Tiling、Ascend C bring-up
-kernel、PTA 注册、Python 包装、示例和 contract tests。接口与当前实现边界见
-[`docs/valid_rows_matmul_gelu.md`](docs/valid_rows_matmul_gelu.md)，新增算子的统一规范见
-[`DEVELOPMENT_GUIDE.md`](DEVELOPMENT_GUIDE.md)。`soulboy_identity` 只保留为最小编译样例。
+## 环境准备
 
-## 环境要求
-
-- Linux（x86_64 或 aarch64）
-- CMake 3.16+
-- 配套的 CANN Toolkit 与 Ascend C 编译工具链
-
-先加载 CANN 环境：
+在安装了配套 CANN、PyTorch 和 torch_npu 的 Linux/Ascend 环境执行：
 
 ```bash
 source /usr/local/Ascend/ascend-toolkit/set_env.sh
 ```
 
-如果安装路径不是默认路径，可设置 `ASCEND_HOME_PATH` 或 `ASCEND_TOOLKIT_HOME`；也可以直接用
-`ASCENDC_CMAKE_DIR` 指向包含 `ascendc.cmake` 的目录。
-
-## 编译
+非默认 CANN 路径可通过 `-p` 指定，例如：
 
 ```bash
-./build.sh --soc ascend910b
-./build.sh --soc ascend910b --pta
+bash build.sh -p /usr/local/Ascend/ascend-toolkit/latest -c ascend910b
 ```
 
-常用选项：
+## Ascend C 算子编译
+
+命令与 `omni-ops/inference/ascendc` 相同：
 
 ```bash
-./build.sh --help
-./build.sh --soc ascend910_93 --jobs 32
-./build.sh --clean --build-type Debug
+# 编译全部算子
+bash build.sh -c ascend910b
+
+# 编译指定算子；多个算子以分号分隔
+bash build.sh -n 'valid_rows_matmul_gelu' -c ascend910b
 ```
 
-默认构建产物安装到 `output/lib/`。也可以直接调用 CMake：
+如 CANN 版本兼容校验失败，可增加 `--disable-check-compatible`。成功后在 `output/` 生成：
+
+```text
+CANN-soulboy_custom_ops-<cann-version>-linux.<arch>.run
+```
+
+## 安装 run 包
 
 ```bash
-cmake -S . -B build \
-  -DSOC_VERSION=ascend910b \
-  -DASCEND_CANN_PACKAGE_PATH=/usr/local/Ascend/latest \
-  -DCMAKE_INSTALL_PREFIX="$PWD/output"
-cmake --build build --target install --parallel
+cd output
+chmod +x CANN-soulboy_custom_ops-*.run
+./CANN-soulboy_custom_ops-*.run \
+  --quiet \
+  --install-path=/usr/local/Ascend/ascend-toolkit/latest/opp
+source /usr/local/Ascend/ascend-toolkit/latest/opp/vendors/soulboy_custom_ops/bin/set_env.bash
 ```
+
+run 包必须与 CANN 和机器架构匹配。安装到其他 OPP 根目录时，相应调整 `--install-path` 和
+`source` 路径。
+
+## PTA wheel 编译与安装
+
+命令与 omni-ops 相同：
+
+```bash
+cd torch_ops_extension
+bash build_and_install.sh
+```
+
+脚本执行 `setup.py build bdist_wheel`，在 `dist/` 生成 wheel 并通过 `pip3 --force-reinstall`
+安装。PTA 扩展通过自动生成的 `aclnnValidRowsMatmulGelu` 接口调用已安装的 custom OPP。
 
 ## Python 使用
 
-```bash
-python -m pip install -e .
-python examples/valid_rows_matmul_gelu.py
+```python
+import torch
+import torch_npu
+import soulboy_custom_ops  # 加载 so，并把接口挂载到 torch_npu
+
+x = torch.randn(128, 256, dtype=torch.float16, device="npu")
+weight = torch.randn(256, 512, dtype=torch.float16, device="npu")
+bias = torch.randn(512, dtype=torch.float32, device="npu")
+valid_rows = torch.tensor([17], dtype=torch.int64, device="npu")
+
+y = torch_npu.npu_valid_rows_matmul_gelu(x, weight, bias, valid_rows)
+# 等价：torch.ops.custom.npu_valid_rows_matmul_gelu(...)
 ```
 
-PTA 共享库默认从 `output/lib/libsoulboy_pta.so` 加载，也可通过
-`SOULBOY_PTA_LIBRARY` 指定。CPU 侧 contract tests 可用：
-
-```bash
-PYTHONPATH=python python -m pytest tests/test_python_contract.py
-```
-
-## 新增算子
-
-1. 新建 `csrc/ops/<operator>/op_kernel/`。
-2. 将 Ascend C Kernel 源文件放入该目录。
-3. 如需公共头文件，可在算子目录下增加 `include/`，并在 `csrc/CMakeLists.txt` 中给目标添加 include path。
-4. 执行 `./build.sh --soc <soc_version>`。
-
-新增前先阅读 `DEVELOPMENT_GUIDE.md`。本仓库当前的 `ValidRowsMatmulGelu` Ascend C kernel
-仍是 bring-up 版本；用户侧可验收语义由 PTA 组合实现提供，生产性能 kernel 尚需在 910B
-机器上用 Matmul 高阶 API 和 AIC/AIV 混合核替换。
+完整可运行示例见
+`src/ops-transformer/matmul/valid_rows_matmul_gelu/example/test_valid_rows_matmul_gelu.py`；接口约束见同目录
+`docs/valid_rows_matmul_gelu.md`。新增算子前阅读根目录 `DEVELOPMENT_GUIDE.md`。

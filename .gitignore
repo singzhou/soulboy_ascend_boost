@@ -7,6 +7,7 @@ output/
 *.o
 *.so
 *.run
+*.whl
 __pycache__/
 *.egg-info/
 dist/

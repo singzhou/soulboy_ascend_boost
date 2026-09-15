@@ -1,92 +1,96 @@
 # Ascend C 算子开发准则
 
-本文是本仓库新增算子的最低交付标准，来自 `ValidRowsMatmulGelu` 首次落地以及
-`ops-transformer`、`omni-ops` 的工程约定。
+本准则以 `omni-ops/inference/ascendc` 的工程形式和本仓首个算子的落地经验为基线。
 
-## 1. 命名
+## 1. 固定目录
 
-同一概念在不同层使用确定的机械映射，禁止随意缩写：
-
-| 层级 | 规则 | 示例 |
-|---|---|---|
-| GE 算子类型 | UpperCamelCase | `ValidRowsMatmulGelu` |
-| kernel/文件/目录 | snake_case | `valid_rows_matmul_gelu.cpp` |
-| C++ 函数 | UpperCamelCase 或项目既有风格 | `ValidRowsMatmulGeluTiling` |
-| Python 公共接口 | snake_case | `valid_rows_matmul_gelu` |
-| torch namespace | 固定为 `soulboy` | `torch.ops.soulboy.valid_rows_matmul_gelu` |
-| ACLNN（若提供） | `aclnn` + UpperCamelCase | `aclnnValidRowsMatmulGelu` |
-
-输入名必须表达语义（`valid_rows`），不用 `input1`。数量、字节和偏移字段加后缀
-`Count`、`Bytes`、`Offset`；shape 维度沿用领域字母 `m/n/k`，在文档首次出现时解释。
-
-## 2. 目录与层次
-
-每个算子至少包含：
+每个 Ascend C 算子放在：
 
 ```text
-csrc/ops/<op>/
-├── op_host/       # 原型、InferShape、Tiling、注册
-└── op_kernel/     # Ascend C kernel 与共享 TilingData
-docs/<op>.md       # 用户接口与限制
-examples/<op>.py   # 最小可运行 Python 示例
-tests/             # contract、tiling 边界和 NPU 正确性测试
+src/ops-transformer/<category>/<op_name>/
+├── CMakeLists.txt
+├── docs/<op_name>.md
+├── example/test_<op_name>.py
+├── op_host/
+│   ├── CMakeLists.txt
+│   ├── <op_name>_def.cpp
+│   ├── <op_name>_tiling.cpp
+│   └── <op_name>_tiling.h
+└── op_kernel/<op_name>.cpp
 ```
 
-PTA 注册只负责参数校验、输出分配与调用 ACLNN/算子，不复制 tiling 和 kernel 算法。
-Host 和 Device tiling 应调用同一个纯策略函数，避免两份逻辑漂移。
+PTA 适配放在：
 
-## 3. 接口规范
+```text
+torch_ops_extension/soulboy_custom_ops/ops_transformer/<category>/<op_name>/csrc/
+```
 
-接口文档必须给出：数学定义、每个输入输出的 shape/dtype/format/device、合法值域、连续性、
-动态 shape/值依赖、错误行为、精度阈值、workspace、副作用和支持的 SoC/CANN 版本。
+不得再为单个算子创建根目录级 `pta/`、`python/` 或第二套 CMake 工程。
 
-设计时遵守：
+## 2. 命名映射
 
-1. 输出 shape 能静态推导时，不读取 Device 值；只影响 tiling 的输入使用
-   `ValueDepend(OPTIONAL, DependScope::TILING)`。
-2. 非法值返回失败，不静默 clamp；`0`、空张量、对齐边界和最大值都有明确语义。
-3. TilingData 只含定宽 POD 字段和官方可序列化结构，不放指针、STL 容器或 ABI 敏感对象。
-   Host 定义使用 `register/tilingdata_base.h`；kernel 定义使用
-   `kernel_tiling/kernel_tiling.h` 和等价 POD，禁止让 AI Core 编译依赖 Host 注册头文件。
-4. workspace 用 `uint64_t/size_t` 检查溢出并按编译期最大 shape 预留。
-5. PTA 同时注册 `PrivateUse1` 与 `Meta`；Meta 路径不得访问 Tensor 数据。
-6. Python 封装保留 Device Tensor 参数，禁止为方便调用 `.item()` 引入隐式 D2H 同步。
+| 层 | 规则 | 示例 |
+|---|---|---|
+| GE Op 类型 | UpperCamelCase | `ValidRowsMatmulGelu` |
+| 目录、文件、kernel | snake_case | `valid_rows_matmul_gelu` |
+| ACLNN API | `aclnn` + GE 类型 | `aclnnValidRowsMatmulGelu` |
+| PyTorch schema | `custom::npu_<op_name>` | `custom::npu_valid_rows_matmul_gelu` |
+| Python/torch_npu | `npu_<op_name>` | `torch_npu.npu_valid_rows_matmul_gelu` |
 
-## 4. Tiling 与 kernel
+输入输出必须使用语义名称，不使用 `input1`、`output1`。同一参数在 OpDef、Tiling、PTA、文档和
+示例中的顺序与含义必须完全一致。
 
-- Tiling 函数先判空、校验 rank/dtype/shape/value，再写 TilingData；失败后不得使用半初始化数据。
-- Device 值在编译期可能无 data 指针，使用静态最大值生成可编译、可分配的计划。
-- `valid_rows=0` 等零工作量必须有独立快速路径。
-- 混合 AIC/AIV kernel 的生产者/消费者必须显式使用跨核 flag；文档写明 flag 所有权。
-- 每个 block 的 GM 范围必须可由 tiling 字段独立证明无重叠、无越界。
-- 首版先正确再优化，但临时标量实现必须在文档中标成 bring-up，不可伪装成性能版本。
+## 3. CMake 接线
 
-## 5. Python 调用例子模板
+- 算子根 `CMakeLists.txt` 只遍历有 CMakeLists 的子目录，保持与 omni-ops 一致。
+- OpDef 加入 `op_host_aclnn`，Tiling 加入 `optiling`；需要设备侧 Tiling 时，由
+  `cmake/tiling_sink.cmake` 汇总到 `cust_opmaster`。
+- `OpAICoreConfig` 显式填写 `opFile.value`，值必须等于 kernel 文件名。
+- 新增头文件依赖时在目标的 `target_include_directories` 增加准确目录，禁止依赖宿主机偶然存在的
+  全局 include path。
+- 构建入口固定为 `bash build.sh -n '<op_name>' -c <soc>`，产物必须进入 `output/*.run`。
 
-示例必须包含确定随机种子、显式 dtype/device、最小与边界 shape、Device 上构造的值依赖、
-参考实现和 `torch.testing.assert_close`。模板：
+## 4. 接口与 Tiling 规范
+
+接口文档必须写清数学定义、输入输出 shape/dtype/format/device、合法值域、值依赖、动态 shape、
+workspace、精度、支持 SoC/CANN 版本和已知限制。
+
+- 只影响执行规模的 Device Tensor 使用 `ValueDepend(..., DependScope::TILING)`，不得在 Python/PTA
+  中 `.item()` 造成 D2H 同步。
+- Host TilingData 使用 `register/tilingdata_base.h`；kernel 侧使用字段完全一致的定宽 POD，禁止把
+  Host 注册头带入 AI Core 编译。
+- Host 与 Device Tiling 复用同一策略函数；注册宏分别使用 `IMPL_OP_OPTILING` 和
+  `DEVICE_IMPL_OP_OPTILING`。
+- Tiling 必须检查空指针、rank、shape、值域和溢出；失败时不得写半初始化数据。
+- 明确定义 `0`、空张量、对齐边界和最大 shape 的行为；GM 访问必须能证明无越界和无写冲突。
+
+## 5. PTA 接口规范
+
+- schema 集中注册在 `csrc_base/ops_def_registration.cpp`。
+- 每个算子注册 `PrivateUse1` 和 `Meta`；Meta 只推导输出，不访问 Tensor 数据。
+- PTA 只做参数检查、输出分配和 `EXEC_NPU_CMD_V1(aclnn..., ...)`，不得重复 kernel 算法。
+- Python 包导入后同时支持 `torch.ops.custom.npu_<op>()` 和 `torch_npu.npu_<op>()`。
+- wheel 构建入口固定为 `cd torch_ops_extension && bash build_and_install.sh`。
+
+## 6. Python 示例模板
+
+示例必须导入 `soulboy_custom_ops`，使用确定随机种子、显式 NPU/dtype、Device 上的值依赖 Tensor、
+参考实现和 `torch.testing.assert_close`。至少覆盖一个正常值和一个边界值；错误必须令进程非零退出。
 
 ```python
+import soulboy_custom_ops
+
 torch.manual_seed(7)
-x = torch.randn(..., dtype=torch.float16, device="npu")
-runtime_value = torch.tensor([...], dtype=torch.int64, device="npu")
-actual = public_api(x, ..., runtime_value)
-expected = reference(x, ..., runtime_value)
-torch.testing.assert_close(actual, expected, rtol=..., atol=...)
+runtime_value = torch.tensor([17], dtype=torch.int64, device="npu")
+actual = torch_npu.npu_example(x, runtime_value)
+expected = reference(x, runtime_value)
+torch.testing.assert_close(actual, expected, rtol=2e-3, atol=2e-3)
 ```
-
-不要只打印结果；示例必须在错误时以非零状态退出。不要用超大 shape 作为唯一示例。
-
-## 6. 文档模板
-
-每份 `docs/<op>.md` 按以下顺序：功能与公式、接口表、约束、构建/安装、Python 示例、
-精度与性能、错误处理、兼容矩阵、已知限制。代码和文档中的 dtype、参数顺序必须一致。
 
 ## 7. 合入门槛
 
-- `git diff --check`、shell 语法、Python compile/contract tests 全部通过。
-- 在目标 910B 环境完成 kernel、Host tiling、Device tiling 和 PTA 编译。
-- 覆盖 `0/1/15/16/17/max` 等边界与非法值；输出无效区严格为零。
-- profiler 证明值依赖 tiling 在 AI CPU 执行；与关闭 tiling sink 的结果一致。
-- 示例能从干净环境按文档命令运行；构建产物和缓存不提交。
-- PR 说明记录 CANN、驱动、固件、torch、torch_npu、SoC 与复现命令。
+- `git diff --check`、`bash -n build.sh`、`bash -n torch_ops_extension/build_and_install.sh`、Python 语法检查通过。
+- 在目标 Ascend 环境完成 `bash build.sh -n '<op>' -c <soc>`，安装 `.run` 后成功 source vendor 环境。
+- 完成 PTA wheel 构建安装并运行 Python 示例；覆盖 `0/1/对齐前后/最大值/非法值`。
+- 提交说明记录 CANN、驱动、固件、torch、torch_npu、SoC、完整构建和复现命令。
+- `build/`、`output/`、wheel、so、缓存等产物不得提交。
