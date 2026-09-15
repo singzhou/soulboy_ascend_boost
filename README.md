@@ -74,6 +74,14 @@ source /usr/local/Ascend/ascend-toolkit/latest/opp/vendors/soulboy_custom_ops/bi
 run 包必须与 CANN 和机器架构匹配。安装到其他 OPP 根目录时，相应调整 `--install-path` 和
 `source` 路径。
 
+若使用精简容器，工程会在打包前检查 `/tmp`。CANN 9.0.1 的 makeself 脚本固定在该目录创建
+`mkself*.tar`；当前用户无权创建或写入 `/tmp` 时，需要由容器管理员执行：
+
+```bash
+mkdir -p /tmp
+chmod 1777 /tmp
+```
+
 ## PTA wheel 编译与安装
 
 命令与 omni-ops 相同：

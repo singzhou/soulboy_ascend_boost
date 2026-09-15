@@ -81,6 +81,25 @@ function set_env()
     fi
 }
 
+function ensure_cpack_tmp()
+{
+    # CANN 9.0.1's makeself implementation writes /tmp/mkself<pid>{,.tar}
+    # directly and does not honor TMPDIR. Some minimal containers do not
+    # create /tmp, so fail early or create the directory when permitted.
+    if [ ! -d /tmp ]; then
+        if ! mkdir -p /tmp; then
+            log "Error: /tmp is required by the CANN makeself packager and could not be created."
+            exit 1
+        fi
+        chmod 1777 /tmp || true
+    fi
+
+    if [ ! -w /tmp ]; then
+        log "Error: /tmp is not writable; CANN cannot create the custom-op run package."
+        exit 1
+    fi
+}
+
 function clean()
 {
     if [ -n "${BUILD_DIR}" ];then
@@ -437,6 +456,8 @@ CUSTOM_OPTION="${CUSTOM_OPTION} -DCUSTOM_ASCEND_CANN_PACKAGE_PATH=${ASCEND_CANN_
 ########################################################################################################################
 
 set_env
+
+ensure_cpack_tmp
 
 clean
 
