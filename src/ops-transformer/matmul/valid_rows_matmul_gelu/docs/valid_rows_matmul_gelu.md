@@ -39,7 +39,12 @@ source /usr/local/Ascend/ascend-toolkit/latest/opp/vendors/soulboy_custom_ops/bi
 
 cd ../torch_ops_extension
 bash build_and_install.sh
+
+python ../src/ops-transformer/matmul/valid_rows_matmul_gelu/example/test_valid_rows_matmul_gelu.py
 ```
+
+PTA 构建脚本同时生成 wheel 和源码树内的 `custom_ops_lib`，因此上述示例可直接从
+`torch_ops_extension` 目录运行。
 
 ## Python 调用
 

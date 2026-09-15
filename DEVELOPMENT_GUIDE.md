@@ -71,7 +71,8 @@ workspace、精度、支持 SoC/CANN 版本和已知限制。
 - 每个算子注册 `PrivateUse1` 和 `Meta`；Meta 只推导输出，不访问 Tensor 数据。
 - PTA 只做参数检查、输出分配和 `EXEC_NPU_CMD_V1(aclnn..., ...)`，不得重复 kernel 算法。
 - Python 包导入后同时支持 `torch.ops.custom.npu_<op>()` 和 `torch_npu.npu_<op>()`。
-- wheel 构建入口固定为 `cd torch_ops_extension && bash build_and_install.sh`。
+- wheel 构建入口固定为 `cd torch_ops_extension && bash build_and_install.sh`；脚本必须同时执行
+  `build_ext --inplace` 并从源码目录做 import 冒烟检查，避免源码包遮蔽已安装 wheel。
 
 ## 6. Python 示例模板
 

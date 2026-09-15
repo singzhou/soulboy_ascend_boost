@@ -11,15 +11,23 @@
 set -e
 
 BASE_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
-cd ${BASE_DIR}
+cd "${BASE_DIR}"
 
 # 移除历史编译结果
 rm -rf build dist *.egg-info
+rm -f soulboy_custom_ops/custom_ops_lib*.so
 
 # 编译wheel包
 python3 setup.py build bdist_wheel
 
+# 同步生成源码树内的扩展。否则在本目录执行 Python 时，源码包会遮蔽已安装的
+# wheel，而源码包中缺少 custom_ops_lib，最终表现为误导性的循环导入错误。
+python3 setup.py build_ext --inplace
+
 # 安装wheel包
-cd ${BASE_DIR}/dist
-pip3 install *.whl --force-reinstall
-cd -
+cd "${BASE_DIR}/dist"
+python3 -m pip install ./*.whl --force-reinstall
+
+# 必须从源码目录验证，以覆盖最容易触发包遮蔽的使用方式。
+cd "${BASE_DIR}"
+python3 -c "import soulboy_custom_ops; print('soulboy_custom_ops import passed')"

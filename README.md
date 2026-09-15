@@ -91,8 +91,10 @@ cd torch_ops_extension
 bash build_and_install.sh
 ```
 
-脚本执行 `setup.py build bdist_wheel`，在 `dist/` 生成 wheel 并通过 `pip3 --force-reinstall`
-安装。PTA 扩展通过自动生成的 `aclnnValidRowsMatmulGelu` 接口调用已安装的 custom OPP。
+脚本在 `dist/` 生成并强制重装 wheel，同时执行 `build_ext --inplace` 生成源码树内的原生扩展，
+因此从 `torch_ops_extension` 目录运行 Python 时不会被同名源码包遮蔽。安装结束前会从该目录执行
+一次 import 冒烟检查。PTA 扩展通过自动生成的 `aclnnValidRowsMatmulGelu` 接口调用已安装的
+custom OPP。
 
 ## Python 使用
 
@@ -113,3 +115,9 @@ y = torch_npu.npu_valid_rows_matmul_gelu(x, weight, bias, valid_rows)
 完整可运行示例见
 `src/ops-transformer/matmul/valid_rows_matmul_gelu/example/test_valid_rows_matmul_gelu.py`；接口约束见同目录
 `docs/valid_rows_matmul_gelu.md`。新增算子前阅读根目录 `DEVELOPMENT_GUIDE.md`。
+
+安装完成后可在仓库任意目录运行：
+
+```bash
+python3 /path/to/soulboy_ascend_boost/src/ops-transformer/matmul/valid_rows_matmul_gelu/example/test_valid_rows_matmul_gelu.py
+```
